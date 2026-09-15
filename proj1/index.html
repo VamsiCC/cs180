@@ -47,14 +47,14 @@
     <h1>CS180 Project 1: Colorizing the Prokudin-Gorskii Photo Collection</h1>
     
     <h2>Algorithm Overview and Implementation</h2>
-    <p>The goal of this project was to take digitized glass plate negatives from the early 1900s and combine their red, green, and blue color channels to create full color images. </p>
+    <p>The goal of this project was to take digitized glass plate negatives from the early 1900s type photos and combine their red, green, and blue color channels to create full color images. </p>
     
-    <p>To do this I used the Euclidean distance (L2 norm) metric to score how well the channels aligned. The lower the difference between the overlapping pixels, the better the alignment. Since the edges of these historical glass plates have a ton of noise and mismatched borders, I cropped out the outer 10 percent of the images before calculating the differences so the algorithm would only focus on the actual subject matter.</p>
+    <p>To do this I used the Euclidean distance (which is the L2 norm) metric to score how well the channels aligned. The lower the difference between the overlapping pixels, the better the alignment. Since the edges of the glass plates have a ton of noise and mismatched borders, I cropped out the outer 10 percent of the images before calculating the differences so the algorithm would only focus on the actual subject matter (emir, mosque, etc.).</p>
 
-    <p>For small images a simple exhaustive search over a 30x30 pixel window worked perfectly. But for the massive high resolution files checking every single pixel offset took way too long. To fix this I built an image pyramid. The algorithm shrinks the images down by a factor of 2 over and over until they are small enough to align quickly. Then it scales those initial coarse offsets back up and refines them at each resolution step. This made the whole alignment process run super fast while still being highly accurate.</p>
+    <p>For small images a simple exhaustive search over a 30x30 pixel window worked perfectly. But for the massive high resolution files checking every single pixel offset took way too long. To fix this I built an image pyramid like described in the project doc. The algorithm shrinks the images down by a factor of 2 over and over until they are small enough to align quickly. Then it scales those initial coarse offsets back up and refines them at each resolution step. This made the whole alignment process run super fast while still being highly accurate.</p>
 
-    <h2>Low-Resolution Images (Single-Scale Alignment)</h2>
-    <p>These are the smaller .jpg images that were aligned using the basic exhaustive search method.</p>
+    <h2>Low-Resolution Images (Just Single Scale Alignment)</h2>
+    <p>These are the smaller .jpg images that were aligned using the basic search method.</p>
 
     <div class="image-container">
         <h3>Cathedral</h3>
@@ -75,7 +75,7 @@
     </div>
 
     <h2>High-Resolution Images (Multi-Scale Pyramid Alignment)</h2>
-    <p>These are the large .tif files that required the image pyramid approach for efficient processing.</p>
+    <p>These are the large .tif files that required the image pyramid method.</p>
 
     <div class="image-container">
         <h3>Harvesters</h3>
@@ -132,7 +132,7 @@
     </div>
 
     <h2>Custom Prokudin-Gorskii Collection Images</h2>
-    <p>Here are three extra images I found from the Library of Congress collection and ran through my algorithm.</p>
+    <p>Here are three extra images I found from the Library of Congress website and ran through my algorithm.</p>
     
     <div class="image-container">
         <h3>Dam</h3>
@@ -153,9 +153,9 @@
     </div>
 
     <h2>Failures and Fixes (Edge Detection)</h2>
-    <p>When I first ran the basic algorithm a couple of the images completely failed to align. Originally the Emir picture looked completely ruined just like the bad example in the project spec document. The Church image was also noticeably misaligned.</p>
+    <p>When I first ran the basic algorithm a couple of the images completely failed to align. Originally the Emir picture looked completely ruined just like the bad example in the project spec document. The Church image was also really misaligned and looked like a hallucination.</p>
 
-    <p>This happened because the L2 norm distance metric assumes that objects have roughly the same brightness across all three color channels. But the Emir is wearing a brilliant blue robe. In the blue glass plate his robe appears incredibly bright but in the red and green negatives his robe appears very dark. Because the brightness values were basically opposites the L2 norm got completely confused trying to match the pixels.</p>
+    <p>This happened because the L2 norm distance metric assumes that objects have roughly the same brightness across all three color channels. But the Emir is wearing a a really strong blue robe. In the blue glass plate his robe appears incredibly bright but in the red and green negatives his robe appears very dark. Because the brightness values were basically opposites the L2 norm got completely confused trying to match the pixels.</p>
 
     <p>To fix this I used a Sobel filter from the scikit-image library to extract the edges of the images before comparing them. The Sobel filter essentially draws a white outline wherever it sees a sharp edge and turns the rest of the image black. By running the L2 norm on these edge detected outlines rather than the raw pixel colors the algorithm completely ignored the brightness differences and successfully locked onto the physical shapes of the buildings and people. Here are the successfully aligned versions using edge detection.</p>
 
@@ -163,12 +163,12 @@
         <div class="comparison-item">
             <h3>The Emir of Bukhara (Before)</h3>
             <img src="v1/aligned_emir.jpg" alt="Emir Before">
-            <p>Failed Alignment (L2 Norm)</p>
+            <p>Failed Alignment (Just L2 Norm)</p>
         </div>
         <div class="comparison-item">
             <h3>The Emir of Bukhara (After)</h3>
             <img src="v2/aligned_emir.jpg" alt="Emir After">
-            <p>Fixed Alignment (Edge Detection)<br>Green Offset: (49, 24) <br> Red Offset: (107, 40)</p>
+            <p>Fixed Alignment (Added Edge Detection)<br>Green Offset: (49, 24) <br> Red Offset: (107, 40)</p>
         </div>
     </div>
 
@@ -176,12 +176,12 @@
         <div class="comparison-item">
             <h3>Church on the Water (Before)</h3>
             <img src="v1/aligned_church.jpg" alt="Church Before">
-            <p>Failed Alignment (L2 Norm)</p>
+            <p>Failed Alignment (Just L2 Norm)</p>
         </div>
         <div class="comparison-item">
             <h3>Church on the Water (After)</h3>
             <img src="v2/aligned_church.jpg" alt="Church After">
-            <p>Fixed Alignment (Edge Detection)<br>Green Offset: (25, 4) <br> Red Offset: (58, -4)</p>
+            <p>Fixed Alignment (Added Edge Detection)<br>Green Offset: (25, 4) <br> Red Offset: (58, -4)</p>
         </div>
     </div>
 
