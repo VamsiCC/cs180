@@ -153,6 +153,16 @@ def conv_two(image, kernel):
             <div class="caption">SciPy Convolution</div>
         </div>
     </div>
+    <div class="row">
+        <div class="col">
+            <img src="selfie_dx.jpg" alt="Selfie Dx">
+            <div class="caption">Selfie Filtered with Dx</div>
+        </div>
+        <div class="col">
+            <img src="selfie_dy.jpg" alt="Selfie Dy">
+            <div class="caption">Selfie Filtered with Dy</div>
+        </div>
+    </div>
 
     <h3>Part 1.2: Finite Difference Operator</h3>
     <p>Using the humble finite difference operators Dx = [1, 0, -1] and Dy = [1, 0, -1]^T, I computed the partial derivatives of the cameraman image. The gradient magnitude was computed as the Euclidean norm of the x and y derivatives. Finally, a binarized edge image was created to suppress noise. I selected a threshold of 0.15, which successfully suppresses the background noise on the grass and sky while retaining the sharp structural edges of the coat and tripod.</p>
@@ -285,7 +295,19 @@ def conv_two(image, kernel):
     </div>
 
     <h4>Custom Hybrid & Frequency Analysis: Brad Pitt and Ed Norton</h4>
-    <p>This hybrid blends two faces. For this image, I used a <strong>high-frequency cutoff (Sigma 1) of 4.0</strong> for Brad Pitt, and a <strong>low-frequency cutoff (Sigma 2) of 6.0</strong> for Ed Norton. Below are the original images, the final hybrid, and the complete frequency analysis grid showing the filtered spatial images and 2D Fourier transforms (log magnitude).</p>
+    <p>This hybrid blends two faces. For this image, I used a <strong>high-frequency cutoff (Sigma 1) of 4.0</strong> for Brad Pitt, and a <strong>low-frequency cutoff (Sigma 2) of 6.0</strong> for Ed Norton. Below is the full pipeline from raw inputs to the final composition.</p>
+    
+    <div class="row">
+        <div class="col">
+            <img src="brad.jpg" alt="Brad Pitt">
+            <div class="caption">Original Subject 1 (Brad)</div>
+        </div>
+        <div class="col">
+            <img src="ed.jpg" alt="Ed Norton">
+            <div class="caption">Original Subject 2 (Ed)</div>
+        </div>
+    </div>
+
     <div class="row">
         <div class="col">
             <img src="brad_aligned.jpg" alt="Brad Aligned">
@@ -295,16 +317,20 @@ def conv_two(image, kernel):
             <img src="ed_aligned.jpg" alt="Ed Aligned">
             <div class="caption">Aligned Subject 2 (Ed)</div>
         </div>
-    </div>    
+    </div>
+
     <div class="row">
         <div class="col">
-            <img src="brad.jpg" alt="Brad Pitt">
-            <div class="caption">Subject 1 (High Frequency - Brad)</div>
+            <img src="brad_filtered.jpg" alt="Brad Filtered">
+            <div class="caption">Filtered High Frequencies (Brad)</div>
         </div>
         <div class="col">
-            <img src="ed.jpg" alt="Ed Norton">
-            <div class="caption">Subject 2 (Low Frequency - Ed)</div>
+            <img src="ed_filtered.jpg" alt="Ed Filtered">
+            <div class="caption">Filtered Low Frequencies (Ed)</div>
         </div>
+    </div>
+    
+    <div class="row">
         <div class="col">
             <img src="brad_ed_hybrid.jpg" alt="Brad Ed Hybrid">
             <div class="caption">Final Hybrid (Brad + Ed)</div>
@@ -312,7 +338,7 @@ def conv_two(image, kernel):
     </div>
     
     <img src="brad_ed_analysis.png" alt="Fourier Analysis Grid" class="wide-img">
-    <div class="caption">Filtered images and log magnitude of the 2D Fourier Transform across the filtering process.</div>
+    <div class="caption">Log magnitude of the 2D Fourier Transform across the filtering process.</div>
 
     <h4>The G.O.A.T. (Lebron + Goat)</h4>
     <div class="row">
