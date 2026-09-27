@@ -87,7 +87,61 @@
     <p>In this section, I implemented a 2D convolution operation from scratch using both 4 nested loops and 2 nested loops (vectorized over patches). Padding was implemented using a zero-fill "same" padding strategy to maintain original image dimensions.</p>
     
     <p>The custom implementation successfully mirrors the output of <code>scipy.signal.convolve2d</code>. However, the scipy function is highly optimized with a C backend, making its runtime orders of magnitude faster than the native Python 2-loop and 4-loop variants. For boundaries, zero-padding was manually applied to replicate the <code>mode='same', boundary='fill'</code> settings in the built-in function.</p>
+<pre><code>import numpy as np
+import time
+import cv2
+from scipy.signal import convolve2d
+
+def conv_four(image, kernel):
+    kernel = np.flip(kernel)
+    ih, iw = image.shape
+    kh, kw = kernel.shape
+    pad_h = kh // 2
+    pad_w = kw // 2
     
+    padded = np.pad(image, ((pad_h, pad_h), (pad_w, pad_w)), mode='constant', constant_values=0)
+    output = np.zeros_like(image, dtype=np.float64)
+    
+    for i in range(ih):
+        for j in range(iw):
+            for ki in range(kh):
+                for kj in range(kw):
+                    output[i, j] += padded[i + ki, j + kj] * kernel[ki, kj]
+    return output
+
+def conv_two(image, kernel):
+    kernel = np.flip(kernel)
+    ih, iw = image.shape
+    kh, kw = kernel.shape
+    pad_h = kh // 2
+    pad_w = kw // 2
+    
+    padded_img = np.pad(image, ((pad_h, pad_h), (pad_w, pad_w)), mode='constant', constant_values=0)
+    output = np.zeros_like(image, dtype=np.float64)
+    
+    for i in range(ih):
+        for j in range(iw):
+            patch = padded_img[i:i+kh, j:j+kw]
+            output[i, j] = np.sum(patch * kernel)
+    return output
+</code></pre>
+
+    <p>The custom implementation successfully mirrors the output of <code>scipy.signal.convolve2d</code>. However, the scipy function is highly optimized with a C backend, making its runtime orders of magnitude faster than the native Python 2-loop and 4-loop variants. For boundaries, zero-padding was manually applied to replicate the <code>mode='same', boundary='fill'</code> settings in the built-in function.</p>
+    
+    <div class="row">
+        <div class="col">
+            <img src="selfie.jpg" alt="Original Selfie">
+            <div class="caption">Original Selfie</div>
+        </div>
+        <div class="col">
+            <img src="custom_conv.jpg" alt="Custom Convolution">
+            <div class="caption">Custom Convolution (Box Filter)</div>
+        </div>
+        <div class="col">
+            <img src="sci_conv.jpg" alt="SciPy Convolution">
+            <div class="caption">SciPy Convolution</div>
+        </div>
+    </div>  
     <div class="row">
         <div class="col">
             <img src="selfie.jpg" alt="Original Selfie">
