@@ -1,0 +1,375 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CS180 Project 2: Fun with Filters and Frequencies</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f9f9f9;
+        }
+        h1, h2, h3 {
+            color: #003262; /* Berkeley Blue */
+        }
+        h1 {
+            text-align: center;
+            border-bottom: 2px solid #FDB515; /* California Gold */
+            padding-bottom: 10px;
+        }
+        .section-box {
+            background: #fff;
+            padding: 20px;
+            margin-bottom: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        .image-grid {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 20px;
+            margin: 20px 0;
+        }
+        .image-card {
+            text-align: center;
+            flex: 1 1 300px;
+            max-width: 350px;
+        }
+        .image-card img {
+            max-width: 100%;
+            height: auto;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        .image-row {
+            display: flex;
+            justify-content: space-around;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+        .image-row .image-card {
+            flex: 1;
+            min-width: 150px;
+        }
+        pre {
+            background: #f4f4f4;
+            padding: 15px;
+            border-left: 4px solid #003262;
+            overflow-x: auto;
+            font-size: 14px;
+        }
+        code {
+            font-family: Consolas, Monaco, 'Andale Mono', 'Ubuntu Mono', monospace;
+        }
+        .wide-img {
+            max-width: 100%;
+            height: auto;
+            display: block;
+            margin: 0 auto;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>Project 2: Fun with Filters and Frequencies!</h1>
+    <p style="text-align: center;"><strong>Vamsi Chilamkur</strong> | CS180: Intro to Computer Vision and Computational Photography</p>
+
+    <!-- PART 1 -->
+    <div class="section-box">
+        <h2>Part 1: Fun with Filters</h2>
+        
+        <h3>Part 1.1: Convolutions from Scratch!</h3>
+        <p>In this section, I implemented a 2D convolution operation from scratch using both 4 nested loops and 2 nested loops (vectorized over patches). Padding was implemented using a zero-fill "same" padding strategy to maintain original image dimensions.</p>
+        
+        <p><strong>Code Snippets:</strong></p>
+<pre><code>def conv_four(image, kernel):
+    kernel = np.flip(kernel)
+    ih, iw = image.shape
+    kh, kw = kernel.shape
+    pad_h, pad_w = kh // 2, kw // 2
+    padded = np.pad(image, ((pad_h, pad_h), (pad_w, pad_w)), mode='constant', constant_values=0)
+    output = np.zeros_like(image, dtype=np.float64)
+    for i in range(ih):
+        for j in range(iw):
+            for ki in range(kh):
+                for kj in range(kw):
+                    output[i, j] += padded[i + ki, j + kj] * kernel[ki, kj]
+    return output
+
+def conv_two(image, kernel):
+    kernel = np.flip(kernel)
+    ih, iw = image.shape
+    kh, kw = kernel.shape
+    pad_h, pad_w = kh // 2, kw // 2
+    padded_img = np.pad(image, ((pad_h, pad_h), (pad_w, pad_w)), mode='constant', constant_values=0)
+    output = np.zeros_like(image, dtype=np.float64)
+    for i in range(ih):
+        for j in range(iw):
+            patch = padded_img[i:i+kh, j:j+kw]
+            output[i, j] = np.sum(patch * kernel)
+    return output</code></pre>
+
+        <p><strong>Comparison with <a href="https://docs.scipy.org/doc/scipy/reference/generated/scipy.signal.convolve2d.html"><code>scipy.signal.convolve2d</code></a>:</strong><br>
+        The custom implementation successfully mirrors the output of <code>scipy.signal.convolve2d</code>. However, the <code>scipy</code> function is highly optimized with a C backend, making its runtime orders of magnitude faster than the native Python 2-loop and 4-loop variants. For boundaries, zero-padding was manually applied to replicate the `mode='same', boundary='fill'` settings in the built-in function.</p>
+        
+        <div class="image-grid">
+            <div class="image-card">
+                <img src="selfie.jpg" alt="Original Selfie">
+                <p>Original Selfie</p>
+            </div>
+            <div class="image-card">
+                <img src="custom_conv.jpg" alt="Custom Convolution">
+                <p>Custom Convolution (Box Filter)</p>
+            </div>
+            <div class="image-card">
+                <img src="sci_conv.jpg" alt="SciPy Convolution">
+                <p>SciPy Convolution</p>
+            </div>
+        </div>
+
+        <hr>
+
+        <h3>Part 1.2: Finite Difference Operator</h3>
+        <p>Using the humble finite difference operators $D_x = [1, 0, -1]$ and $D_y = [1, 0, -1]^T$, I computed the partial derivatives of the cameraman image. The gradient magnitude was computed as the Euclidean norm of the $x$ and $y$ derivatives. Finally, a binarized edge image was created to suppress noise. I selected a threshold of <code>0.15</code>, which I found to be the "sweet spot" that successfully suppresses the background noise on the grass and sky while retaining the sharp structural edges of the coat and tripod.</p>
+
+        <div class="image-row">
+            <div class="image-card">
+                <img src="cameraman_dx.jpg" alt="D_x">
+                <p>Derivative in X</p>
+            </div>
+            <div class="image-card">
+                <img src="cameraman_dy.jpg" alt="D_y">
+                <p>Derivative in Y</p>
+            </div>
+            <div class="image-card">
+                <img src="cameraman_grad_mag.jpg" alt="Gradient Magnitude">
+                <p>Gradient Magnitude</p>
+            </div>
+            <div class="image-card">
+                <img src="cameraman_edges.jpg" alt="Binarized Edges">
+                <p>Binarized Edges (Threshold = 0.15)</p>
+            </div>
+        </div>
+
+        <hr>
+
+        <h3>Part 1.3: Derivative of Gaussian (DoG) Filter</h3>
+        <p>The standard finite difference method is highly susceptible to noise. To resolve this, I first blurred the image with a Gaussian filter before taking the derivatives. Alternatively, due to the associative property of convolutions, we can convolve the Gaussian kernel directly with $D_x$ and $D_y$ to create single-pass Derivative of Gaussian (DoG) filters. Both methods produce identical, much cleaner edges.</p>
+        
+        <div class="image-grid">
+            <div class="image-card">
+                <img src="cameraman_blurred.jpg" alt="Gaussian Blurred">
+                <p>Gaussian Blurred Cameraman</p>
+            </div>
+            <div class="image-card">
+                <img src="cameraman_grad_mag_blur.jpg" alt="Gradient Magnitude (Blurred)">
+                <p>Gradient Magnitude (from Blurred)</p>
+            </div>
+            <div class="image-card">
+                <img src="cameraman_edges_blur.jpg" alt="Binarized Edges (Blurred)">
+                <p>Binarized Edges (Gaussian Smoothed)</p>
+            </div>
+        </div>
+        <div class="image-grid">
+            <div class="image-card">
+                <img src="DoG_x_filter.jpg" alt="DoG X Filter">
+                <p>DoG Filter (X)</p>
+            </div>
+            <div class="image-card">
+                <img src="DoG_y_filter.jpg" alt="DoG Y Filter">
+                <p>DoG Filter (Y)</p>
+            </div>
+            <div class="image-card">
+                <img src="cameraman_edges_dog.jpg" alt="Binarized Edges (DoG)">
+                <p>Binarized Edges (Single Pass DoG)</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- PART 2 -->
+    <div class="section-box">
+        <h2>Part 2: Fun with Frequencies!</h2>
+        
+        <h3>Part 2.1: Image "Sharpening"</h3>
+        <p>The unsharp masking technique works by extracting the high frequencies of an image (by subtracting a Gaussian-blurred, low-pass version from the original) and adding a scaled amount of those high frequencies back into the original. This artificially boosts edge contrast, making it perceptually sharper. Mathematically, this multi-step process simplifies to a single unsharp mask filter via $f * ((1+\alpha)e - \alpha g)$.</p>
+        
+        <h4>Taj Mahal Unsharp Masking</h4>
+        <div class="image-row">
+            <div class="image-card"><img src="taj.jpg" alt="Original"><p>Original Taj Mahal</p></div>
+            <div class="image-card"><img src="taj_blurred.jpg" alt="Blurred"><p>Blurred (Low Frequencies)</p></div>
+            <div class="image-card"><img src="taj_high_freq.jpg" alt="High Freq"><p>Extracted High Frequencies</p></div>
+        </div>
+        <div class="image-row">
+            <div class="image-card"><img src="taj_sharpened_alpha_1.0.jpg" alt="Alpha 1"><p>Sharpened ($\alpha = 1.0$)</p></div>
+            <div class="image-card"><img src="taj_sharpened_alpha_2.0.jpg" alt="Alpha 2"><p>Sharpened ($\alpha = 2.0$)</p></div>
+            <div class="image-card"><img src="taj_sharpened_alpha_3.0.jpg" alt="Alpha 3"><p>Sharpened ($\alpha = 3.0$)</p></div>
+            <div class="image-card"><img src="taj_sharpened_single.jpg" alt="Single Filter"><p>Single Pass Filter Equivalent</p></div>
+        </div>
+
+        <h4>Evaluation: Artificially Blurring and Re-sharpening</h4>
+        <p>I took a sharp, high-quality image, blurred it artificially, and attempted to restore it. <strong>Observation:</strong> Sharpening cannot fully reconstruct the original image. The initial Gaussian blur permanently destroys the highest frequency data (fine textures and micro-edges). Re-sharpening only boosts the <i>surviving</i> mid-range frequencies, resulting in thick, unnatural "halos" along major structural lines rather than restoring the true original texture.</p>
+        <div class="image-grid">
+            <div class="image-card">
+                <img src="sharp_img.jpg" alt="Original Sharp">
+                <p>Original Sharp Image</p>
+            </div>
+            <div class="image-card">
+                <img src="eval_artificially_blurred.jpg" alt="Artificially Blurred">
+                <p>Artificially Blurred</p>
+            </div>
+            <div class="image-card">
+                <img src="eval_resharpened.jpg" alt="Resharpened">
+                <p>Re-sharpened (Loss of detail & haloing)</p>
+            </div>
+        </div>
+
+        <hr>
+
+        <h3>Part 2.2: Hybrid Images</h3>
+        <p>Based on the SIGGRAPH 2006 paper by Oliva, Torralba, and Schyns, <a href="http://cvcl.mit.edu/hybridimage.htm">hybrid images</a> exploit how humans perceive spatial frequencies at varying distances. By combining the high frequencies of one image (visible up close) with the low frequencies of another (visible from afar), the interpretation of the image changes based on viewing distance.</p>
+        
+        <h4>1. Derek and Nutmeg</h4>
+        <div class="image-grid">
+            <div class="image-card">
+                <img src="DerekPicture.jpg" alt="Derek">
+                <p>Derek (Low Frequency)</p>
+            </div>
+            <div class="image-card">
+                <img src="nutmeg.jpg" alt="Nutmeg">
+                <p>Nutmeg (High Frequency)</p>
+            </div>
+            <div class="image-card">
+                <img src="derek_nutmeg_hybrid.jpg" alt="Hybrid">
+                <p>Final Hybrid (Look from afar!)</p>
+            </div>
+        </div>
+
+        <h4>2. Custom Hybrid & Frequency Analysis</h4>
+        <p>This hybrid blends two faces. Below is the complete frequency analysis showing the 2D Fourier transforms (log magnitude) of the inputs, the filtered outputs, and the final hybrid composition.</p>
+        <div class="image-grid">
+            <div class="image-card">
+                <img src="brad.jpg" alt="Subject 1">
+                <p>Subject 1 (High Frequency)</p>
+            </div>
+            <div class="image-card">
+                <img src="ed.jpg" alt="Subject 2">
+                <p>Subject 2 (Low Frequency)</p>
+            </div>
+            <div class="image-card">
+                <img src="brad_ed_hybrid.jpg" alt="Hybrid">
+                <p>Final Hybrid</p>
+            </div>
+        </div>
+        <img src="brad_ed_analysis.png" alt="Fourier Analysis Grid" class="wide-img" style="max-width: 800px;">
+        <p style="text-align:center;"><em>Log magnitude of the 2D Fourier Transform across the filtering process.</em></p>
+
+        <h4>3. The G.O.A.T. (Lebron + Goat)</h4>
+        <div class="image-grid">
+            <div class="image-card">
+                <img src="goat.jpg" alt="Goat">
+                <p>Goat (High Frequency)</p>
+            </div>
+            <div class="image-card">
+                <img src="lebron.jpg" alt="Lebron">
+                <p>LeBron (Low Frequency)</p>
+            </div>
+            <div class="image-card">
+                <img src="lebron_goat_hybrid.jpg" alt="Lebron Goat Hybrid">
+                <p>Final Hybrid</p>
+            </div>
+        </div>
+
+        <hr>
+
+        <h3>Part 2.3: Gaussian and Laplacian Stacks</h3>
+        <p>Unlike image pyramids that downsample data, stacks maintain the original resolution at every level to prevent masking and alignment issues during blending. Below are the Laplacian stacks for the Apple and Orange, reproducing Figure 3.42 from <a href="https://szeliski.org/Book/">Szeliski (Ed 2)</a>.</p>
+        
+        <h4>Apple Laplacian Stack</h4>
+        <div class="image-row">
+            <div class="image-card"><img src="apple_laplacian_level_0.jpg"><p>Level 0</p></div>
+            <div class="image-card"><img src="apple_laplacian_level_1.jpg"><p>Level 1</p></div>
+            <div class="image-card"><img src="apple_laplacian_level_2.jpg"><p>Level 2</p></div>
+            <div class="image-card"><img src="apple_laplacian_level_3.jpg"><p>Level 3</p></div>
+        </div>
+        
+        <h4>Orange Laplacian Stack</h4>
+        <div class="image-row">
+            <div class="image-card"><img src="orange_laplacian_level_0.jpg"><p>Level 0</p></div>
+            <div class="image-card"><img src="orange_laplacian_level_1.jpg"><p>Level 1</p></div>
+            <div class="image-card"><img src="orange_laplacian_level_2.jpg"><p>Level 2</p></div>
+            <div class="image-card"><img src="orange_laplacian_level_3.jpg"><p>Level 3</p></div>
+        </div>
+
+        <hr>
+
+        <h3>Part 2.4: Multiresolution Blending</h3>
+        <p>Using the 1983 technique by <a href="https://www.cs.princeton.edu/courses/archive/fall05/cos429/papers/burt_adelson.pdf">Burt and Adelson</a>, images can be seamlessly spliced. Instead of a harsh boundary, multiresolution blending blends high frequencies over a very narrow window and low frequencies over a wide window, resulting in a smooth transition that respects both texture and lighting.</p>
+        
+        <h4>The Oraple (Recreation of Figure 3.42)</h4>
+        <div class="image-grid">
+            <div class="image-card">
+                <img src="apple.jpeg" alt="Apple">
+                <p>Apple</p>
+            </div>
+            <div class="image-card">
+                <img src="orange.jpeg" alt="Orange">
+                <p>Orange</p>
+            </div>
+            <div class="image-card">
+                <img src="oraple.jpg" alt="Oraple">
+                <p>Final Oraple</p>
+            </div>
+        </div>
+        <img src="oraple_process.jpg" alt="Oraple Process" class="wide-img" style="max-width: 600px;">
+        <p style="text-align:center;"><em>Breakdown of the masked levels.</em></p>
+
+        <h4>Custom Blend 1: Tower Rivalry (Vertical Seam)</h4>
+        <p>Combining the architectural features of UC Berkeley's Campanile with Stanford's Hoover Tower using a vertical step-function mask.</p>
+        <div class="image-grid">
+            <div class="image-card">
+                <img src="berkeley_tower.png" alt="Berkeley Tower">
+                <p>Berkeley Campanile</p>
+            </div>
+            <div class="image-card">
+                <img src="stanford_tower.jpg" alt="Stanford Tower">
+                <p>Stanford Hoover Tower</p>
+            </div>
+            <div class="image-card">
+                <img src="tower_rivalry.jpg" alt="Tower Rivalry">
+                <p>Blended Towers</p>
+            </div>
+        </div>
+
+        <h4>Custom Blend 2: The Bionic Palm (Irregular Mask)</h4>
+        <p>This fulfills the irregular mask requirement by blending a camera lens seamlessly into a human hand using a circular mask. The high-frequency ridges of the lens remain sharp, while the low-frequency ambient lighting of the skin bleeds perfectly into the glass.</p>
+        <div class="image-grid">
+            <div class="image-card">
+                <img src="camera.jpeg" alt="Camera Lens">
+                <p>Camera Lens</p>
+            </div>
+            <div class="image-card">
+                <img src="hand.jpg" alt="Human Hand">
+                <p>Human Hand</p>
+            </div>
+            <div class="image-card">
+                <img src="bionic_palm.jpg" alt="Bionic Palm">
+                <p>The Bionic Palm</p>
+            </div>
+        </div>
+        <img src="bionic_palm_process.jpg" alt="Bionic Palm Process" class="wide-img" style="max-width: 600px;">
+        <p style="text-align:center;"><em>Irregular mask blending breakdown.</em></p>
+
+        <hr>
+        
+        <h3>Reflection</h3>
+        <p>The most important thing I learned from this project was how powerful frequency separation is for image manipulation. While standard alpha blending causes severe ghosting and harsh edges, utilizing Laplacian stacks to treat the color data (low frequencies) independently from the structural edge data (high frequencies) allows for photorealistic compositing that handles disparate lighting scenarios beautifully.</p>
+    </div>
+
+</body>
+</html>
