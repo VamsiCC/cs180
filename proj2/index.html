@@ -69,10 +69,22 @@
             text-align: center;
             color: #444;
         }
+        
+        /* Code block styling */
+        pre {
+            background-color: #f4f4f4;
+            padding: 15px;
+            border-left: 4px solid #ccc;
+            overflow-x: auto;
+            font-size: 13px;
+            border-radius: 4px;
+        }
         code {
+            font-family: Consolas, Monaco, 'Andale Mono', 'Ubuntu Mono', monospace;
+        }
+        p code {
             background-color: #f4f4f4;
             padding: 2px 4px;
-            font-family: monospace;
             border-radius: 4px;
         }
     </style>
@@ -85,8 +97,7 @@
     
     <h3>Part 1.1: Convolutions from Scratch!</h3>
     <p>In this section, I implemented a 2D convolution operation from scratch using both 4 nested loops and 2 nested loops (vectorized over patches). Padding was implemented using a zero-fill "same" padding strategy to maintain original image dimensions.</p>
-    
-    <p>The custom implementation successfully mirrors the output of <code>scipy.signal.convolve2d</code>. However, the scipy function is highly optimized with a C backend, making its runtime orders of magnitude faster than the native Python 2-loop and 4-loop variants. For boundaries, zero-padding was manually applied to replicate the <code>mode='same', boundary='fill'</code> settings in the built-in function.</p>
+
 <pre><code>import numpy as np
 import time
 import cv2
@@ -125,23 +136,9 @@ def conv_two(image, kernel):
             output[i, j] = np.sum(patch * kernel)
     return output
 </code></pre>
-
+    
     <p>The custom implementation successfully mirrors the output of <code>scipy.signal.convolve2d</code>. However, the scipy function is highly optimized with a C backend, making its runtime orders of magnitude faster than the native Python 2-loop and 4-loop variants. For boundaries, zero-padding was manually applied to replicate the <code>mode='same', boundary='fill'</code> settings in the built-in function.</p>
     
-    <div class="row">
-        <div class="col">
-            <img src="selfie.jpg" alt="Original Selfie">
-            <div class="caption">Original Selfie</div>
-        </div>
-        <div class="col">
-            <img src="custom_conv.jpg" alt="Custom Convolution">
-            <div class="caption">Custom Convolution (Box Filter)</div>
-        </div>
-        <div class="col">
-            <img src="sci_conv.jpg" alt="SciPy Convolution">
-            <div class="caption">SciPy Convolution</div>
-        </div>
-    </div>  
     <div class="row">
         <div class="col">
             <img src="selfie.jpg" alt="Original Selfie">
@@ -211,9 +208,6 @@ def conv_two(image, kernel):
             <div class="caption">Binarized Edges (Single Pass DoG)</div>
         </div>
     </div>
-
-    <h3>Bells & Whistles: Gradient Orientations (HSV)</h3>
-    <p>To visualize the gradient orientations, I computed the angle of the gradient at each pixel using the arctangent of the Y and X derivatives (<code>np.arctan2</code>). I then mapped these angles (from -pi to pi) to the Hue channel of an HSV image, and used the gradient magnitude as the Value (brightness) channel so that only the actual physical edges display the colorized angles.</p>
 
     <h2>Part 2: Fun with Frequencies!</h2>
     
