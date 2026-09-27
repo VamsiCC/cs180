@@ -96,7 +96,7 @@
     <h2>Part 1: Fun with Filters</h2>
     
     <h3>Part 1.1: Convolutions from Scratch!</h3>
-    <p>In this section, I implemented a 2D convolution operation from scratch using both 4 nested loops and 2 nested loops (vectorized over patches). Padding was implemented using a zero-fill "same" padding strategy to maintain original image dimensions.</p>
+    <p>In this section, I implemented a 2D convolution operation from scratch using both 4 nested loops and 2 nested loops. I implemented padding  using a zero-fill same padding strategy to keep the original image dimensions.</p>
 
 <pre><code>import numpy as np
 import time
@@ -137,7 +137,7 @@ def conv_two(image, kernel):
     return output
 </code></pre>
     
-    <p>The custom implementation successfully mirrors the output of <code>scipy.signal.convolve2d</code>. However, the scipy function is highly optimized with a C backend, making its runtime orders of magnitude faster than the native Python 2-loop and 4-loop variants. For boundaries, zero-padding was manually applied to replicate the <code>mode='same', boundary='fill'</code> settings in the built-in function.</p>
+    <p>My custom implementation basically mirrors the output of <code>scipy.signal.convolve2d</code>. However, the scipy function is a lot faster due to its professional implementation so its runtime orders of magnitude faster than the native Python 2-loop and 4-loop variants. For boundaries, zero padding was manually applied to replicate the <code>mode='same', boundary='fill'</code> settings in the built-in function.</p>
     
     <div class="row">
         <div class="col">
@@ -165,7 +165,7 @@ def conv_two(image, kernel):
     </div>
 
     <h3>Part 1.2: Finite Difference Operator</h3>
-    <p>Using the humble finite difference operators Dx = [1, 0, -1] and Dy = [1, 0, -1]^T, I computed the partial derivatives of the cameraman image. The gradient magnitude was computed as the Euclidean norm of the x and y derivatives. Finally, a binarized edge image was created to suppress noise. I selected a threshold of 0.15, which successfully suppresses the background noise on the grass and sky while retaining the sharp structural edges of the coat and tripod.</p>
+    <p>Using the finite difference operators Dx = [1, 0, -1] and Dy = [1, 0, -1]^t, I computed the partial derivatives of the cameraman image. The gradient magnitude was computed as the Euclidean norm of the x and y derivatives. Then I created a binarized edge image was to suppress noise. I played around with a couple of thresholds and settled on 0.15 which  suppresses the background noise on the grass and sky while keeping the sharp structural edges of the coat and tripod.</p>
 
     <div class="row">
         <div class="col">
@@ -222,7 +222,7 @@ def conv_two(image, kernel):
     <h2>Part 2: Fun with Frequencies!</h2>
     
     <h3>Part 2.1: Image "Sharpening"</h3>
-    <p>The unsharp masking technique works by extracting the high frequencies of an image (by subtracting a Gaussian-blurred version from the original) and adding a scaled amount of those high frequencies back into the original. This artificially boosts edge contrast, making it perceptually sharper. Mathematically, this multi-step process simplifies to a single unsharp mask filter via <code>f * ((1+alpha)e - alpha g)</code>.</p>
+    <p>The unsharp masking technique works by extracting the high frequencies of an image, by subtracting a Gaussian blurred version from the original, and adding a scaled amount of those high frequencies back into the original. This boosts the edge contrast, making it sharper. This process just simplifies to a single unsharp mask filter using <code>f * ((1+alpha)e - alpha g)</code>.</p>
     
     <div class="row">
         <div class="col">
@@ -258,8 +258,8 @@ def conv_two(image, kernel):
         </div>
     </div>
 
-    <h4>Evaluation: Artificially Blurring and Re-sharpening</h4>
-    <p>I took a sharp, high-quality image, blurred it artificially, and attempted to restore it. <strong>Observation:</strong> Sharpening cannot fully reconstruct the original image. The initial Gaussian blur permanently destroys the highest frequency data (fine textures and micro-edges). Re-sharpening only boosts the surviving mid-range frequencies, resulting in thick, unnatural "halos" along major structural lines rather than restoring the true original texture.</p>
+    <h4>Eval: Artificially Blurring and Re-sharpening</h4>
+    <p>I took a sharp, high-quality image of an owl perched that I found online, blurred it artificially, then tried to restore it. <strong>Observation:</strong> Sharpening cannot fully reconstruct the original image sadly. The initial Gaussian blur permanently destroys the highest frequency data (fine textures and small edges). Resharpening only boosts the surviving mid-range frequencies, resulting in thick, unnatural blurry halos along major structural lines rather than restoring the true original texture. This displays the limitation of the procedure.</p>
     
     <div class="row">
         <div class="col">
@@ -277,7 +277,7 @@ def conv_two(image, kernel):
     </div>
 
     <h3>Part 2.2: Hybrid Images</h3>
-    <p>Hybrid images exploit how humans perceive spatial frequencies at varying distances. By combining the high frequencies of one image (visible up close) with the low frequencies of another (visible from afar), the interpretation of the image changes based on viewing distance.</p>
+    <p>Hybrid images use how humans perceive spatial frequencies at varying distances. By combining the high frequencies of one image (visible up close) with the low frequencies of another (visible from far away), the interpretation of the image changes based on viewing distance.</p>
     
     <div class="row">
         <div class="col">
@@ -295,7 +295,7 @@ def conv_two(image, kernel):
     </div>
 
     <h4>Custom Hybrid & Frequency Analysis: Brad Pitt and Ed Norton</h4>
-    <p>This hybrid blends two faces. For this image, I used a <strong>high-frequency cutoff (Sigma 1) of 4.0</strong> for Brad Pitt, and a <strong>low-frequency cutoff (Sigma 2) of 6.0</strong> for Ed Norton. Below is the full pipeline from raw inputs to the final composition.</p>
+    <p>This hybrid blends two faces, that of Brad Pitt and Edward Norton. I thought of this idea since one of my favorite movies is Fight Club. If you haven't watched the movie, the big twist is that Brad Pitt's character ends up being a hallucination and it was just Edward Norton talking to himself the entire time. For this image, I used a <strong>high-frequency cutoff (Sigma 1) of 4.0</strong> for Brad Pitt, and a <strong>low-frequency cutoff (Sigma 2) of 6.0</strong> for Ed Norton. Here is the full pipeline from raw inputs to the final composition.</p>
     
     <div class="row">
         <div class="col">
@@ -340,7 +340,7 @@ def conv_two(image, kernel):
     <img src="brad_ed_analysis.png" alt="Fourier Analysis Grid" class="wide-img">
     <div class="caption">Log magnitude of the 2D Fourier Transform across the filtering process.</div>
 
-    <h4>The G.O.A.T. (Lebron + Goat)</h4>
+    <h4>The Glorious Sunshine (Lebron the Goat)</h4>
     <div class="row">
         <div class="col">
             <img src="goat.jpg" alt="Goat">
@@ -355,12 +355,8 @@ def conv_two(image, kernel):
             <div class="caption">Final Hybrid</div>
         </div>
     </div>
-
-    <h4>Bells & Whistles: Color in Hybrid Images</h4>
-    <p>Through experimentation, I found that using color for <strong>both</strong> components generally produces the best results, but using color for just the low-frequency component is also highly effective. Using color only for the high-frequency component tends to create distracting, unnatural color artifacts up close. Since the human visual system relies more on color for low-frequency global structure and contrast for high-frequency fine details, coloring the low-frequency background yields a very convincing illusion.</p>
-
     <h3>Part 2.3: Gaussian and Laplacian Stacks</h3>
-    <p>Unlike image pyramids that downsample data, stacks maintain the original resolution at every level to prevent masking and alignment issues during blending. Below are the Laplacian stacks for the Apple and Orange, reproducing Figure 3.42 from the textbook.</p>
+    <p>Not like image pyramids that downsample data, the stacks maintain the original resolution at every level to prevent masking and alignment issues during blending. Below are the Laplacian stacks for the Apple and Orange, reproducing the same image from the textbook.</p>
     
     <h4>Apple Laplacian Stack</h4>
     <div class="row">
@@ -411,9 +407,9 @@ def conv_two(image, kernel):
     </div>
 
     <h3>Part 2.4: Multiresolution Blending</h3>
-    <p>Using the 1983 technique by Burt and Adelson, images can be seamlessly spliced. Instead of a harsh boundary, multiresolution blending blends high frequencies over a very narrow window and low frequencies over a wide window, resulting in a smooth transition that respects both texture and lighting.</p>
+    <p>Using the technique by Burt and Adelson, images can be seamlessly spliced. Instead of using a harsh boundary, multiresolution blending blends high frequencies over a very narrow window and low frequencies over a wide window, resulting in a smooth transition that respects both texture and lighting.</p>
     
-    <p><strong>Bells & Whistles: Color Blending:</strong> I implemented color blending for all multiresolution outputs by applying the Laplacian stacks across all three RGB color channels independently, rather than just grayscale. This dramatically enhances the realism of the blended outputs.</p>
+    <p><strong>Bells & Whistles: Color Blending:</strong> I implemented color blending for all multiresolution outputs by applying the Laplacian stacks across all three RGB color channels independently, rather than just grayscale. This dramatically enhances the realism of the blended outputs and without this the outputs looked really flat and poor.</p>
 
     <h4>The Oraple (Recreation of Figure 3.42)</h4>
     <div class="row">
@@ -434,8 +430,8 @@ def conv_two(image, kernel):
     <img src="oraple_process.jpg" alt="Oraple Process" class="wide-img">
     <div class="caption">Oraple Blending Process Breakdown across Laplacian frequencies.</div>
 
-    <h4>Custom Blend 1: Tower Rivalry (Vertical Seam)</h4>
-    <p>Combining the architectural features of UC Berkeley's Campanile with Stanford's Hoover Tower using a vertical step-function mask.</p>
+    <h4>Custom Blend 1: Berkeley and Stanford Tower</h4>
+    <p>Combining the architectural features of UC Berkeley's Campanile with Stanford's Hoover Tower using a vertical step-function mask. This was an idea I had as I walked by the campanile and thought of how people always compare the two towers. It was hard finding the correct view that matched and this was the best I could find.</p>
     
     <div class="row">
         <div class="col">
@@ -453,7 +449,7 @@ def conv_two(image, kernel):
     </div>
 
     <h4>Custom Blend 2: The Bionic Palm (Irregular Mask)</h4>
-    <p>This fulfills the irregular mask requirement by blending a camera lens seamlessly into a human hand using a circular mask. The high-frequency ridges of the lens remain sharp, while the low-frequency ambient lighting of the skin bleeds perfectly into the glass.</p>
+    <p>This fulfills the irregular mask requirement by blending a camera lens seamlessly into a human hand using a circular mask. The high-frequency ridges of the lens remain sharp, while the low-frequency ambient lighting of the skin bleeds perfectly into the glass. The output wasn't that great since the lens was a little to big, I tried to find a lens that was smaller but none would work perfectly. But this is kind of a modern play on the eye in the palm picture in the paper since nowadays there are always cameras watching us.</p>
     
     <div class="row">
         <div class="col">
@@ -474,7 +470,7 @@ def conv_two(image, kernel):
     <div class="caption">Bionic Palm Blending Process Breakdown (Notice the circular mask applied at varying blur levels).</div>
 
     <h2>Reflection</h2>
-    <p>The most important thing I learned from this project was how powerful frequency separation is for image manipulation. While standard alpha blending causes severe ghosting and harsh edges, utilizing Laplacian stacks to treat the color data (low frequencies) independently from the structural edge data (high frequencies) allows for photorealistic compositing that handles disparate lighting scenarios beautifully.</p>
+    <p>The most important thing I learned from this project was how powerful frequency separation is for image manipulation. Even though standard alpha blending causes severe ghosting and harsh edges, using Laplacian stacks to treat the low frequencies independently from the structural edge data (high frequencies) allows for this photorealistic compositing that handles different lighting scenarios beautifully. I really enjoyed playing around with threshold and alphas and seeing the images come together in this project</p>
 
 </body>
 </html>
