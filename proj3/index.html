@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CS180 Project 3: Fun with Flow Models</title>
+<style>
+body {font-family: Georgia, serif; max-width:1100px; margin:0 auto; padding:20px; line-height:1.6; color:#222; background:#fff;}
+h1,h2,h3,h4,nav,figcaption,table {font-family:Arial,sans-serif;}
+h1 {text-align:center; border-bottom:2px solid #ccc; padding-bottom:10px; margin-bottom:8px;}
+.author {text-align:center; margin-top:0;}
+h2 {border-bottom:1px solid #ccc; padding-bottom:5px; margin-top:48px;}
+h3 {margin-top:36px;} h4 {margin-top:28px;}
+a {color:#174f87;} nav {text-align:center; font-size:14px; margin:24px 0;}
+figure {margin:22px auto 30px; width:100%; break-inside:avoid;}
+figure img {display:block; max-width:100%; width:100%; height:auto; border:1px solid #ddd; box-sizing:border-box;}
+figcaption {font-size:14px; color:#444; text-align:center; margin-top:8px; line-height:1.5;}
+.row {display:flex; flex-wrap:wrap; justify-content:center; align-items:flex-start; gap:20px; margin:20px 0;}
+.row figure {flex:1 1 300px; margin:0;}
+.steps figure {flex:1 1 220px; max-width:340px;}
+.distant {display:flex; flex-direction:column; align-items:center; justify-content:center; min-height:180px;}
+.distant img {width:64px; height:64px;} .distant a {display:block;}
+code {font-family:Consolas,Monaco,monospace; font-size:.9em;}
+p code {background:#f4f4f4; padding:2px 4px; border-radius:3px;}
+pre {background:#f4f4f4; padding:15px; border-left:4px solid #ccc; overflow-x:auto; line-height:1.5;}
+table {border-collapse:collapse; width:100%; font-size:14px; margin:20px 0;}
+th,td {border:1px solid #ddd; text-align:left; padding:9px;}
+.table-wrap {overflow-x:auto;} .note {border-left:3px solid #ccc; padding-left:14px; color:#444;}
+@media(max-width:600px) {body {padding:14px;} h1 {font-size:26px;} .row {gap:18px;} .row figure {flex-basis:100%;} .steps figure {flex-basis:45%;} }
+@media print {body {max-width:none; padding:0; font-size:10pt;} nav {display:none;} h2,h3,h4 {break-after:avoid;} a {color:inherit; text-decoration:none;} figure {max-width:100%!important;} figure img {max-height:230mm; object-fit:contain;} }
+</style>
+</head>
+<body>
+<h1>CS180 Project 3: Fun with Flow Models</h1>
+<p class="author">Vamsi Chilamkur</p>
+<nav aria-label="Project sections"><a href="#part-a">Part A</a> · <a href="#a-training">Training and Sampling</a> · <a href="#a-cfg">Guidance</a> · <a href="#a-creative">Creative Applications</a> · <a href="#part-b">Part B</a> · <a href="#b-denoiser">Denoising</a> · <a href="#b-flow">Flow Matching</a></nav>
+<p>In this project, I first used a pretrained flow model to denoise, generate, and edit images. Then I trained UNet models on MNIST to compare single-step denoising with time-conditioned and class-conditioned flow matching. Click any figure to see it at full size.</p>
+<h2 id="part-a">Part A: Exploring the Power of Flow Models</h2>
+<p>Part A uses PixNerd-XXL-P16-T2I at 512 × 512 resolution. I used seed 180 as the base seed, Euler step size 0.02, and guidance weight 7 for the guided experiments. The direction of time is important: t = 0 is noise and t = 1 is a clean image.</p>
+<h3 id="a-training">1. Visualizing Training and Sampling</h3>
+<h4 id="a-1-1">1.1 Constructing Noisy Training Inputs</h4>
+<p>I used an image of a Ferrari Formula 1 car for Sections 1.1–1.5. I sampled one Gaussian noise tensor and reused it at each time, using <code>x_t = (1 − t)ε + t x₁</code>. As t increases, more of the car becomes visible. The endpoint checks give pure noise at t = 0 and the original image at t = 1.</p>
+<figure class="" style="max-width:1000px"><a href="images/training_inputs.png"><img src="images/training_inputs.png" width="1593" height="411" alt="Original Ferrari image and the same noise realization at t = 0.25, 0.50, and 0.75." loading="lazy"></a><figcaption>Original Ferrari image and the same noise realization at t = 0.25, 0.50, and 0.75.</figcaption></figure>
+<pre><code>def interpolate(image, noise, t):
+    return (1 - t) * noise + t * image</code></pre>
+<h4 id="a-1-2">1.2 Classical Denoising</h4>
+<p>I first divided each noisy image by t to restore the image amplitude, then applied Gaussian blur. I tried σ = 1, 2, 4, 8, and 16 and selected the lowest MSE against the original. The selected σ values were 8, 4, and 2 at t = 0.25, 0.50, and 0.75 respectively. Stronger blur removes noise, but also loses the wheel and body details.</p>
+<figure class="" style="max-width:800px"><a href="images/gaussian_t025.png"><img src="images/gaussian_t025.png" width="793" height="411" alt="t = 0.25: noisy input on the left and the selected Gaussian baseline on the right." loading="lazy"></a><figcaption>t = 0.25: noisy input on the left and the selected Gaussian baseline on the right.</figcaption></figure>
+<figure class="" style="max-width:800px"><a href="images/gaussian_t050.png"><img src="images/gaussian_t050.png" width="793" height="411" alt="t = 0.50: noisy input on the left and the selected Gaussian baseline on the right." loading="lazy"></a><figcaption>t = 0.50: noisy input on the left and the selected Gaussian baseline on the right.</figcaption></figure>
+<figure class="" style="max-width:800px"><a href="images/gaussian_t075.png"><img src="images/gaussian_t075.png" width="793" height="411" alt="t = 0.75: noisy input on the left and the selected Gaussian baseline on the right." loading="lazy"></a><figcaption>t = 0.75: noisy input on the left and the selected Gaussian baseline on the right.</figcaption></figure>
+<h4 id="a-1-3">1.3 One-Step Denoising</h4>
+<p>The model predicts velocity. I estimated the clean image with <code>x̂₁ = x_t + (1 − t)vθ(x_t, t, c)</code>, using the prompt “a high quality photo”. At t = 0.25, the model recovers a red car but smooths away much of its detail. At t = 0.75, the estimate is much closer to the original because more information is already present.</p>
+<figure class="" style="max-width:1000px"><a href="images/one_step_t025.png"><img src="images/one_step_t025.png" width="1193" height="411" alt="t = 0.25: original, noisy input, and one-step estimate." loading="lazy"></a><figcaption>t = 0.25: original, noisy input, and one-step estimate.</figcaption></figure>
+<figure class="" style="max-width:1000px"><a href="images/one_step_t050.png"><img src="images/one_step_t050.png" width="1193" height="411" alt="t = 0.50: original, noisy input, and one-step estimate." loading="lazy"></a><figcaption>t = 0.50: original, noisy input, and one-step estimate.</figcaption></figure>
+<figure class="" style="max-width:1000px"><a href="images/one_step_t075.png"><img src="images/one_step_t075.png" width="1193" height="411" alt="t = 0.75: original, noisy input, and one-step estimate." loading="lazy"></a><figcaption>t = 0.75: original, noisy input, and one-step estimate.</figcaption></figure>
+<h4 id="a-1-4">1.4 Visualizing Velocity</h4>
+<p>The true velocity for the saved image/noise pair is <code>v_gt = x₁ − ε</code>. I compared the predicted update <code>(1 − t)vθ</code> with the true update <code>x₁ − x_t</code>. The error at each pixel is the RMS difference across RGB before display scaling. All signed updates use the same symmetric scale, with zero at gray, and all error maps use the same color limits.</p>
+<figure class="" style="max-width:400px"><a href="images/original_ferrari.png"><img src="images/original_ferrari.png" width="512" height="512" alt="Original image used for the velocity comparisons." loading="lazy"></a><figcaption>Original image used for the velocity comparisons.</figcaption></figure>
+<figure class="" style="max-width:1000px"><a href="images/velocity_t025.png"><img src="images/velocity_t025.png" width="1558" height="411" alt="t = 0.25: noisy image, predicted update, ground-truth update, and RGB RMS error." loading="lazy"></a><figcaption>t = 0.25: noisy image, predicted update, ground-truth update, and RGB RMS error.</figcaption></figure>
+<figure class="" style="max-width:1000px"><a href="images/velocity_t050.png"><img src="images/velocity_t050.png" width="1558" height="411" alt="t = 0.50: noisy image, predicted update, ground-truth update, and RGB RMS error." loading="lazy"></a><figcaption>t = 0.50: noisy image, predicted update, ground-truth update, and RGB RMS error.</figcaption></figure>
+<figure class="" style="max-width:1000px"><a href="images/velocity_t075.png"><img src="images/velocity_t075.png" width="1558" height="411" alt="t = 0.75: noisy image, predicted update, ground-truth update, and RGB RMS error." loading="lazy"></a><figcaption>t = 0.75: noisy image, predicted update, ground-truth update, and RGB RMS error.</figcaption></figure>
+<p>The error maps emphasize the car’s edges and fine markings. The error is strongest at the lowest t, where the model has less image information to work with.</p>
+<h4 id="a-1-5">1.5 Iterative Denoising with Euler Sampling</h4>
+<p>I recomputed the velocity after every Euler step: <code>x_next = x + h vθ(x, t, c)</code>. Starting at t = 0.50 with h = 0.02 takes 25 updates. The sampler shortens its last step when necessary to end at t = 1. I also checked constant velocity fields, including a start time of 0.93.</p>
+<div class="row steps">
+<figure class="" style="max-width:340px"><a href="images/euler_step00.png"><img src="images/euler_step00.png" width="374" height="373" alt="t = 0.50 · 0 Euler updates" loading="lazy"></a><figcaption>t = 0.50 · 0 Euler updates</figcaption></figure>
+<figure class="" style="max-width:340px"><a href="images/euler_step05.png"><img src="images/euler_step05.png" width="374" height="373" alt="t = 0.60 · 5 Euler updates" loading="lazy"></a><figcaption>t = 0.60 · 5 Euler updates</figcaption></figure>
+<figure class="" style="max-width:340px"><a href="images/euler_step10.png"><img src="images/euler_step10.png" width="374" height="373" alt="t = 0.70 · 10 Euler updates" loading="lazy"></a><figcaption>t = 0.70 · 10 Euler updates</figcaption></figure>
+<figure class="" style="max-width:340px"><a href="images/euler_step15.png"><img src="images/euler_step15.png" width="374" height="373" alt="t = 0.80 · 15 Euler updates" loading="lazy"></a><figcaption>t = 0.80 · 15 Euler updates</figcaption></figure>
+<figure class="" style="max-width:340px"><a href="images/euler_step20.png"><img src="images/euler_step20.png" width="374" height="373" alt="t = 0.90 · 20 Euler updates" loading="lazy"></a><figcaption>t = 0.90 · 20 Euler updates</figcaption></figure>
+<figure class="" style="max-width:340px"><a href="images/euler_step25.png"><img src="images/euler_step25.png" width="374" height="373" alt="t = 1.00 · 25 Euler updates" loading="lazy"></a><figcaption>t = 1.00 · 25 Euler updates</figcaption></figure>
+</div>
+<figure class="" style="max-width:1000px"><a href="images/denoising_comparison.png"><img src="images/denoising_comparison.png" width="1593" height="411" alt="Same t = 0.50 input: original, Gaussian blur, one-step estimate, and Euler denoising." loading="lazy"></a><figcaption>Same t = 0.50 input: original, Gaussian blur, one-step estimate, and Euler denoising.</figcaption></figure>
+<p>Gaussian blur leaves soft details, while the learned methods recover a much clearer car. The one-step and Euler results look similar here; Euler sampling progressively removes the noise instead of making one large extrapolation.</p>
+<p><a href="images/euler_all_states.png">View all 26 saved trajectory states.</a></p>
+<h4 id="a-1-6">1.6 Generating Images from Noise</h4>
+<p>I started from five independent Gaussian noise tensors and sampled from t = 0 to t = 1 using 50 Euler updates. All five use “a high quality photo”, with seeds 180–184. The generic prompt mostly produces people and portraits rather than a broad variety of scenes.</p>
+<figure class="" style="max-width:1000px"><a href="images/conditional_samples.png"><img src="images/conditional_samples.png" width="1602" height="811" alt="Five samples without additional classifier-free guidance, labeled by seed." loading="lazy"></a><figcaption>Five samples without additional classifier-free guidance, labeled by seed.</figcaption></figure>
+<h3 id="a-cfg">2. Conditional Generation and Guidance</h3>
+<h4 id="a-2-1">2.1 Classifier-Free Guidance</h4>
+<p>I evaluated conditional and empty-prompt velocities at the same image and time, then combined them with <code>v_cfg = v_c + w(v_c − v_u)</code>. I used w = 7 and reused the five initial noises from Section 1.6. I checked that w = 0 returns the ordinary conditional prediction.</p>
+<pre><code>v_c = predict_velocity(x, t, condition)
+v_u = predict_velocity(x, t, null_condition)
+v_cfg = v_c + w * (v_c - v_u)</code></pre>
+<figure class="" style="max-width:1000px"><a href="images/cfg_samples.png"><img src="images/cfg_samples.png" width="1602" height="811" alt="Five CFG samples with w = 7, prompt “a high quality photo”, and seeds 180–184." loading="lazy"></a><figcaption>Five CFG samples with w = 7, prompt “a high quality photo”, and seeds 180–184.</figcaption></figure>
+<p>The guided results are more consistent head-and-shoulders portraits. The unguided results include more variation in framing and style, while both sets show a strong bias toward people for this prompt.</p>
+<h3 id="a-creative">3. Creative Applications</h3>
+<h4 id="a-3-1">3.1 Image-to-Image Editing</h4>
+<p>For each input, I mixed it with noise at a chosen starting time and integrated to t = 1 using CFG. All sweeps use “a high quality photo”, w = 7, h = 0.02, and starting times 0.02, 0.04, 0.06, 0.10, 0.14, 0.25, and 0.50. Every panel shows the original first, followed by the seven edits in that order. Smaller starting times allow larger changes; larger starting times preserve the input.</p>
+<h5>Campanile</h5>
+<figure class="" style="max-width:1000px"><a href="images/edit_campanile.png"><img src="images/edit_campanile.png" width="1593" height="811" alt="Campanile: original and seven starting-time edits." loading="lazy"></a><figcaption>Campanile: original and seven starting-time edits.</figcaption></figure>
+<p>At small starting times, the model replaces much of the tower with a simple white shape. The familiar tower returns as the starting time increases.</p>
+<h5>Ferrari</h5>
+<figure class="" style="max-width:1000px"><a href="images/edit_ferrari.png"><img src="images/edit_ferrari.png" width="1593" height="811" alt="Ferrari: original and seven starting-time edits." loading="lazy"></a><figcaption>Ferrari: original and seven starting-time edits.</figcaption></figure>
+<p>At the smallest times, the car can disappear entirely and become a portrait. The red color and car shape return as more of the input is preserved.</p>
+<h5>Jet</h5>
+<figure class="" style="max-width:1000px"><a href="images/edit_jet.png"><img src="images/edit_jet.png" width="1593" height="811" alt="Jet: original and seven starting-time edits." loading="lazy"></a><figcaption>Jet: original and seven starting-time edits.</figcaption></figure>
+<p>The early outputs reinterpret the airplane as boxy or abstract forms. At larger starting times, the wings and cockpit remain much closer to the input.</p>
+<h5>Web Image: Golf</h5>
+<figure class="" style="max-width:1000px"><a href="images/edit_golf.png"><img src="images/edit_golf.png" width="1593" height="811" alt="Web Image: Golf: original and seven starting-time edits." loading="lazy"></a><figcaption>Web Image: Golf: original and seven starting-time edits.</figcaption></figure>
+<p>The smallest starting time produces a person instead of the original scene. Increasing the starting time restores the green background and golf scene.</p>
+<h5>Hand Drawing: Cow</h5>
+<figure class="" style="max-width:1000px"><a href="images/edit_cow_drawing.png"><img src="images/edit_cow_drawing.png" width="1593" height="811" alt="Hand Drawing: Cow: original and seven starting-time edits." loading="lazy"></a><figcaption>Hand Drawing: Cow: original and seven starting-time edits.</figcaption></figure>
+<p>The low-contrast pencil drawing is easily overwhelmed by noise. Most intermediate outputs lose its fine lines, while the larger starting times preserve more of the sketch.</p>
+<h5>Hand Drawing: Basketball</h5>
+<figure class="" style="max-width:1000px"><a href="images/edit_basketball_drawing.png"><img src="images/edit_basketball_drawing.png" width="1593" height="811" alt="Hand Drawing: Basketball: original and seven starting-time edits." loading="lazy"></a><figcaption>Hand Drawing: Basketball: original and seven starting-time edits.</figcaption></figure>
+<p>The model does not consistently turn this sketch into a realistic object. At small starting times the drawing is lost; at larger times the original pencil lines return.</p>
+<h4 id="a-3-2">3.2 Text-Guided Image Editing</h4>
+<p>I reused the Campanile, Ferrari, and jet images with a different prompt for each. The starting times and sampling settings are the same as Section 3.1.</p>
+<h5>Campanile → Rocket</h5>
+<p>Prompt: <code>A rocket ship to launch off a launch pad.</code></p>
+<figure class="" style="max-width:1000px"><a href="images/text_edit_campanile.png"><img src="images/text_edit_campanile.png" width="1580" height="811" alt="Campanile → Rocket: original and edits at all seven starting times." loading="lazy"></a><figcaption>Campanile → Rocket: original and edits at all seven starting times.</figcaption></figure>
+<p>At low starting times, the prompt creates a rocket. At larger times, the original tower dominates. The middle results combine the tall tower shape with rocket features.</p>
+<h5>Ferrari → LEGO Car</h5>
+<p>Prompt: <code>A lego ferrari formula 1 car</code></p>
+<figure class="" style="max-width:1000px"><a href="images/text_edit_ferrari.png"><img src="images/text_edit_ferrari.png" width="1580" height="811" alt="Ferrari → LEGO Car: original and edits at all seven starting times." loading="lazy"></a><figcaption>Ferrari → LEGO Car: original and edits at all seven starting times.</figcaption></figure>
+<p>The low and middle starting times produce blocky LEGO-like cars. At high starting times, the output remains closer to the original Ferrari image.</p>
+<h5>Jet → UFO</h5>
+<p>Prompt: <code>A UFO spaceship saucer hovering</code></p>
+<figure class="" style="max-width:1000px"><a href="images/text_edit_jet.png"><img src="images/text_edit_jet.png" width="1580" height="811" alt="Jet → UFO: original and edits at all seven starting times." loading="lazy"></a><figcaption>Jet → UFO: original and edits at all seven starting times.</figcaption></figure>
+<p>Small starting times produce a flying saucer. As the starting time increases, airplane features return, with intermediate results mixing the two shapes.</p>
+<h4 id="a-3-3">3.3 Visual Anagrams</h4>
+<p>At every step, I averaged a guided prediction for the upright image with a second prediction for the image rotated 180°, rotated back into the original coordinates. Both spatial axes are flipped. Each figure shows the same generated image in its two orientations.</p>
+<p>Prompts: “an oil painting of a quiet river valley” and “an oil painting of a large snowy mountain”.</p>
+<figure class="" style="max-width:800px"><a href="images/anagram_valley_mountain.png"><img src="images/anagram_valley_mountain.png" width="793" height="411" alt="Valley upright (left), snowy mountain rotated 180° (right)." loading="lazy"></a><figcaption>Valley upright (left), snowy mountain rotated 180° (right).</figcaption></figure>
+<p>The landscape can be interpreted in both directions, although the two subjects overlap visually and the mountain interpretation is less distinct.</p>
+<p>Prompts: “a highly detailed illustration of a top half of a polar bear” and “a higly detailed illustration of a duck”.</p>
+<figure class="" style="max-width:800px"><a href="images/anagram_bear_duck.png"><img src="images/anagram_bear_duck.png" width="793" height="411" alt="Polar bear upright (left), duck rotated 180° (right)." loading="lazy"></a><figcaption>Polar bear upright (left), duck rotated 180° (right).</figcaption></figure>
+<p>The white fur and dark facial shapes support both views. The duck’s head and beak become easier to see after rotation.</p>
+<h4 id="a-3-4">3.4 Hybrid Images</h4>
+<p>I combined low-frequency velocity from one prompt with high-frequency velocity from another: <code>v = lowpass(v_a) + v_b − lowpass(v_b)</code>. The Gaussian filter uses σ = 16 and kernel size 265. I used the resulting velocity in each Euler update. The small views below are 64 × 64 pixels, so the broad structure is easier to see.</p>
+<p>Close / high-frequency prompt: “a lithograph of a waterfall”. Distant / low-frequency prompt: “a lithograph of a skull”.</p>
+<div class="row">
+<figure class="" style="max-width:512px"><a href="images/hybrid_skull_waterfall.png"><img src="images/hybrid_skull_waterfall.png" width="512" height="512" alt="Close view: a lithograph of a waterfall." loading="lazy"></a><figcaption>Close view: a lithograph of a waterfall.</figcaption></figure>
+<figure class="distant" style="max-width:350px"><a href="images/hybrid_skull_waterfall_small.png"><img src="images/hybrid_skull_waterfall_small.png" width="64" height="64" alt="Distant view: a lithograph of a skull." loading="lazy"></a><figcaption>Distant view: a lithograph of a skull.</figcaption></figure>
+</div>
+<p>Close / high-frequency prompt: “a lithograph of a forest”. Distant / low-frequency prompt: “a lithograph of a cat”.</p>
+<div class="row">
+<figure class="" style="max-width:512px"><a href="images/hybrid_cat_forest.png"><img src="images/hybrid_cat_forest.png" width="512" height="512" alt="Close view: a lithograph of a forest." loading="lazy"></a><figcaption>Close view: a lithograph of a forest.</figcaption></figure>
+<figure class="distant" style="max-width:350px"><a href="images/hybrid_cat_forest_small.png"><img src="images/hybrid_cat_forest_small.png" width="64" height="64" alt="Distant view: a lithograph of a cat." loading="lazy"></a><figcaption>Distant view: a lithograph of a cat.</figcaption></figure>
+</div>
+<p>The first hybrid uses waterfall-like vertical details inside the larger skull shape. The second uses tree trunks as fine detail inside a broad cat-like silhouette. The subjects are easier to separate by changing viewing distance.</p>
+<h2 id="part-b">Part B: Flow Matching from Scratch</h2>
+<p>For Part B, I trained on the MNIST training split and used held-out test digits for evaluation. Images are 28 × 28 with pixels in [0, 1]. I compared a single-step denoiser, a time-conditioned velocity model, and a model conditioned on both time and digit class.</p>
+<h3 id="b-denoiser">1. Training a Single-Step Denoising UNet</h3>
+<h4 id="b-1-1">1.1 Implementing the UNet</h4>
+<p>My UNet uses an encoder with two downsampling stages, a 7 × 7 average-pooling bottleneck, and a decoder with transposed convolutions. Channel-wise skip connections bring encoder features back into the decoder. The spatial sizes go from 28 × 28 to 14 × 14 to 7 × 7, then to a 1 × 1 bottleneck and back. With base width D, the encoder widths are D, 2D, and 4D. Downsampling, upsampling, and unflattening use batch normalization and GELU; my ConvBlock consists of two 3 × 3 convolutions.</p>
+<h4 id="b-1-2">1.2 Using the UNet to Train a Denoiser</h4>
+<p>I added Gaussian noise using <code>z = x + σε</code>. The rows below use σ = 0.0, 0.2, 0.4, 0.5, 0.6, 0.8, and 1.0 from top to bottom, with the same eight training digits in each row. The digit strokes become harder to separate from the noise as σ increases.</p>
+<figure class="" style="max-width:700px"><a href="images/mnist_noise_levels.png"><img src="images/mnist_noise_levels.png" width="879" height="794" alt="MNIST noising process. Columns keep the same clean digits; rows increase the noise level." loading="lazy"></a><figcaption>MNIST noising process. Columns keep the same clean digits; rows increase the noise level.</figcaption></figure>
+<h4 id="b-1-2-1">1.2.1 Training</h4>
+<p>I trained a D = 128 UNet for 5 epochs with batch size 256, Adam learning rate 10⁻⁴, and σ = 0.5. Fresh noise is sampled for each batch. The MSE objective compares the predicted clean image with the original digit. The loss decreases rapidly at the start and then flattens.</p>
+<figure class="" style="max-width:800px"><a href="images/denoising_loss.png"><img src="images/denoising_loss.png" width="788" height="290" alt="Single-step denoising training loss, with per-step values and a 100-step moving average." loading="lazy"></a><figcaption>Single-step denoising training loss, with per-step values and a 100-step moving average.</figcaption></figure>
+<!-- Add the epoch-1 and epoch-5 clean/noisy/denoised comparison figures here when available. -->
+<p><span class="note">Separate test comparisons from epochs 1 and 5 were not saved in this run. The final trained model’s test outputs are shown in Section 1.2.2 below.</span></p>
+<h4 id="b-1-2-2">1.2.2 Out-of-Distribution Testing</h4>
+<p>I kept the same eight test digits and varied σ. The top row is clean; the next seven rows show denoised outputs at σ = 0.0, 0.2, 0.4, 0.5, 0.6, 0.8, and 1.0. The model performs well around its training noise level. At σ = 1.0, some digits become distorted or ambiguous because more of the original stroke information is lost.</p>
+<figure class="" style="max-width:700px"><a href="images/ood_denoising.png"><img src="images/ood_denoising.png" width="887" height="909" alt="Final model: clean test digits followed by denoised outputs at the seven noise levels." loading="lazy"></a><figcaption>Final model: clean test digits followed by denoised outputs at the seven noise levels.</figcaption></figure>
+<h4 id="b-1-2-3">1.2.3 Denoising Pure Noise</h4>
+<p>I trained a fresh model for 5 epochs with the same hyperparameters, but paired independent Gaussian noise with clean digits. Since the input noise does not identify the target digit, minimizing MSE favors an average of the possible targets.</p>
+<figure class="" style="max-width:800px"><a href="images/pure_noise_loss.png"><img src="images/pure_noise_loss.png" width="788" height="290" alt="Training loss when predicting digits from independent pure noise." loading="lazy"></a><figcaption>Training loss when predicting digits from independent pure noise.</figcaption></figure>
+<figure class="" style="max-width:900px"><a href="images/pure_noise_epoch1.png"><img src="images/pure_noise_epoch1.png" width="713" height="219" alt="Epoch 1: fixed noise inputs on top and predicted outputs below." loading="lazy"></a><figcaption>Epoch 1: fixed noise inputs on top and predicted outputs below.</figcaption></figure>
+<figure class="" style="max-width:900px"><a href="images/pure_noise_epoch5.png"><img src="images/pure_noise_epoch5.png" width="713" height="219" alt="Epoch 5: the same fixed noise inputs and their predicted outputs." loading="lazy"></a><figcaption>Epoch 5: the same fixed noise inputs and their predicted outputs.</figcaption></figure>
+<p>Both checkpoints produce very similar blurry shapes for different noise inputs. The outputs resemble overlapping digit strokes rather than separate digits. This is consistent with learning the pixelwise mean of the training distribution, the MSE-optimal prediction when the input provides no information about the target.</p>
+<h3 id="b-flow">2. Training a Flow Matching Model</h3>
+<p>For flow matching, I sampled a clean digit x₁, noise x₀, and t uniformly from [0, 1]. The training input is <code>x_t = (1 − t)x₀ + t x₁</code>, and the velocity target is <code>x₁ − x₀</code>. The model minimizes MSE between its prediction and that target.</p>
+<h4 id="b-2-1">2.1 Adding Time Conditioning to the UNet</h4>
+<p>Two fully connected blocks embed the normalized scalar time. Each block uses Linear → GELU → Linear. I reshape the embeddings to broadcast across the feature maps and multiply them into the unflattened features and the first upsampling block’s output.</p>
+<h4 id="b-2-2">2.2 Training the Time-Conditioned UNet</h4>
+<p>I used D = 64, batch size 64, and Adam with initial learning rate 10⁻² for 10 epochs. An exponential scheduler multiplies the learning rate by <code>0.1^(1/10)</code> after each epoch. The initial loss spike dominates the plotted scale, so the later changes are harder to see.</p>
+<figure class="" style="max-width:800px"><a href="images/time_loss.png"><img src="images/time_loss.png" width="790" height="290" alt="Time-conditioned flow-matching training loss over 10 epochs." loading="lazy"></a><figcaption>Time-conditioned flow-matching training loss over 10 epochs.</figcaption></figure>
+<h4 id="b-2-3">2.3 Sampling from the Time-Conditioned UNet</h4>
+<p>I sampled from pure noise using 50 Euler updates and a fixed seed of 180 at each checkpoint. The first samples are mostly noisy blobs. More digit-like strokes appear with training, but the epoch-10 results still contain substantial noise and several ambiguous digits.</p>
+<figure class="" style="max-width:1000px"><a href="images/time_epoch1.png"><img src="images/time_epoch1.png" width="1189" height="166" alt="Time-conditioned samples after epoch 1." loading="lazy"></a><figcaption>Time-conditioned samples after epoch 1.</figcaption></figure>
+<figure class="" style="max-width:1000px"><a href="images/time_epoch5.png"><img src="images/time_epoch5.png" width="1189" height="166" alt="Time-conditioned samples after epoch 5." loading="lazy"></a><figcaption>Time-conditioned samples after epoch 5.</figcaption></figure>
+<figure class="" style="max-width:1000px"><a href="images/time_epoch10.png"><img src="images/time_epoch10.png" width="1189" height="166" alt="Time-conditioned samples after epoch 10." loading="lazy"></a><figcaption>Time-conditioned samples after epoch 10.</figcaption></figure>
+<h4 id="b-2-4">2.4 Adding Class Conditioning to the UNet</h4>
+<p>I added two fully connected embeddings of the 10-dimensional one-hot digit label. The decoder modulation becomes <code>h = c₁ × h + t₁</code> after unflattening and <code>h = c₂ × h + t₂</code> after the first upsampling block. During training, I zero the class vector with probability 0.1 so the model also learns an unconditional prediction.</p>
+<h4 id="b-2-5">2.5 Training the Class-Conditioned UNet</h4>
+<p>I trained two independent D = 64 class-conditioned models for 10 epochs with batch size 64. The first uses Adam at initial learning rate 10⁻² with the same exponential decay. The second uses a constant Adam learning rate of 10⁻³. Both use class dropout probability 0.1.</p>
+<div class="row">
+<figure class="" style="max-width:800px"><a href="images/class_scheduler_loss.png"><img src="images/class_scheduler_loss.png" width="790" height="290" alt="Class-conditioned training with exponential learning rate decay." loading="lazy"></a><figcaption>Class-conditioned training with exponential learning rate decay.</figcaption></figure>
+<figure class="" style="max-width:800px"><a href="images/class_constant_lr_loss.png"><img src="images/class_constant_lr_loss.png" width="790" height="290" alt="Class-conditioned training with constant learning rate 10⁻³." loading="lazy"></a><figcaption>Class-conditioned training with constant learning rate 10⁻³.</figcaption></figure>
+</div>
+<p>The scheduled run has a very large early loss spike. Its plot uses a much larger vertical range than the constant-rate run, so their apparent flatness should not be compared directly.</p>
+<h4 id="b-2-6">2.6 Sampling and Removing the Scheduler</h4>
+<p>I sampled four instances of each digit with seed 180, 300 Euler steps, and guidance scale γ = 5.0. Part B uses <code>v = v_u + γ(v_c − v_u)</code>. In every grid, columns correspond to digits 0–9 and each row provides another instance of those classes.</p>
+<h5>Epoch 1</h5>
+<div class="row">
+<figure class="" style="max-width:800px"><a href="images/class_scheduler_epoch1.png"><img src="images/class_scheduler_epoch1.png" width="1029" height="449" alt="Epoch 1: exponential scheduler." loading="lazy"></a><figcaption>Epoch 1: exponential scheduler.</figcaption></figure>
+<figure class="" style="max-width:800px"><a href="images/class_constant_lr_epoch1.png"><img src="images/class_constant_lr_epoch1.png" width="1029" height="449" alt="Epoch 1: constant learning rate 10⁻³." loading="lazy"></a><figcaption>Epoch 1: constant learning rate 10⁻³.</figcaption></figure>
+</div>
+<h5>Epoch 5</h5>
+<div class="row">
+<figure class="" style="max-width:800px"><a href="images/class_scheduler_epoch5.png"><img src="images/class_scheduler_epoch5.png" width="1029" height="449" alt="Epoch 5: exponential scheduler." loading="lazy"></a><figcaption>Epoch 5: exponential scheduler.</figcaption></figure>
+<figure class="" style="max-width:800px"><a href="images/class_constant_lr_epoch5.png"><img src="images/class_constant_lr_epoch5.png" width="1029" height="449" alt="Epoch 5: constant learning rate 10⁻³." loading="lazy"></a><figcaption>Epoch 5: constant learning rate 10⁻³.</figcaption></figure>
+</div>
+<h5>Epoch 10</h5>
+<div class="row">
+<figure class="" style="max-width:800px"><a href="images/class_scheduler_epoch10.png"><img src="images/class_scheduler_epoch10.png" width="1029" height="449" alt="Epoch 10: exponential scheduler." loading="lazy"></a><figcaption>Epoch 10: exponential scheduler.</figcaption></figure>
+<figure class="" style="max-width:800px"><a href="images/class_constant_lr_epoch10.png"><img src="images/class_constant_lr_epoch10.png" width="1029" height="449" alt="Epoch 10: constant learning rate 10⁻³." loading="lazy"></a><figcaption>Epoch 10: constant learning rate 10⁻³.</figcaption></figure>
+</div>
+<p>To compensate for removing the scheduler, I reduced the learning rate from 10⁻² to a fixed 10⁻³. In these runs, the constant-rate model produces legible digits earlier and keeps cleaner backgrounds. By epoch 10, the scheduled model also generates recognizable digits but retains more speckled noise. This comparison supports using the lower constant rate here, although the two models were trained independently and this is a visual comparison rather than a quantitative quality score.</p>
+<h2 id="reflection">Reflection</h2>
+<p>The biggest difference was between trying to predict a whole digit from unrelated noise in one step and learning a velocity field that can be followed gradually. The pure-noise denoiser settled on a blurry average, while flow matching produced individual digits. Class conditioning gave much more control, and the learning rate experiment showed that a simpler constant-rate setup could produce cleaner results in this run.</p>
+<p>Assignment: <a href="https://cal-cs180.github.io/fa26/hw/proj3-flow/parta.html">Part A</a> · <a href="https://cal-cs180.github.io/fa26/hw/proj3-flow/partb.html">Part B</a>.</p>
+</body></html>
