@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CS180 Project 4A: Image Warping and Mosaicing</title>
+<style>
+body { max-width:1100px; margin:30px auto; padding:0 20px; font-family:Georgia,serif; line-height:1.6; color:#222; }
+h1,h2,h3 { font-family:Arial,sans-serif; }
+h1,.author,nav { text-align:center; }
+h2 { margin-top:48px; border-bottom:1px solid #ccc; }
+a { color:#174f87; }
+figure { margin:24px auto; }
+img { display:block; width:100%; height:auto; }
+figcaption { text-align:center; font-size:14px; margin-top:8px; }
+.row { display:flex; gap:20px; }
+.row figure { flex:1; min-width:0; }
+pre { background:#f4f4f4; padding:16px; overflow-x:auto; line-height:1.5; }
+table { border-collapse:collapse; margin:20px 0; }
+th,td { padding:8px 14px; border:1px solid #ccc; text-align:left; }
+@media (max-width:600px) { .row { display:block; } body { padding:0 14px; } h1 { font-size:26px; } }
+</style>
+</head>
+<body>
+<h1>Project 4A: Image Warping and Mosaicing</h1>
+<p class="author">Vamsi Chilamkur · CS180</p>
+<nav><a href="#a1">A.1 Pictures</a> · <a href="#a2">A.2 Homographies</a> · <a href="#a3">A.3 Warping</a> · <a href="#a4">A.4 Mosaics</a></nav>
+<p>This project aligns overlapping photographs using homographies. I first recover the transformation from manually selected correspondences, then implement inverse warping with nearest-neighbor and bilinear interpolation. Finally, I blend the aligned images into three mosaics. Click any image to view the image file.</p>
+<h2 id="a1">A.1: Shoot the Pictures</h2>
+<p>I used three pairs: a Berkeley landscape, my kitchen (a bit messy haha), and my apartment elevators. Each pair shows overlapping views of the same scene. The intended capture method is to rotate the camera about a fixed center of projection so that one homography describes the views, I tried my best to do this and almost all of them ended up pretty good. Camera translation and nearby objects can introduce parallax, the kitchen results below show remaining alignment errors which shows the realism of my transformations.</p>
+<h3>Berkeley from Foothill</h3><div class="row">
+<figure style="max-width:1000px"><a href="images/IMG_5998.jpg"><img src="images/IMG_5998.jpg" width="4032" height="3024" alt="Foothill View Centered" loading="lazy"></a><figcaption>Foothill View Centered</figcaption></figure>
+<figure style="max-width:1000px"><a href="images/IMG_5999.jpg"><img src="images/IMG_5999.jpg" width="4032" height="3024" alt="Foothill View Left" loading="lazy"></a><figcaption>Foothill View Right</figcaption></figure>
+</div>
+<h3>Kitchen</h3><div class="row">
+<figure style="max-width:1000px"><a href="images/IMG_6084.jpg"><img src="images/IMG_6084.jpg" width="4032" height="3024" alt="IMG_6084.jpg" loading="lazy"></a><figcaption>Kitchen Left</figcaption></figure>
+<figure style="max-width:1000px"><a href="images/IMG_6085.jpg"><img src="images/IMG_6085.jpg" width="4032" height="3024" alt="IMG_6085.jpg" loading="lazy"></a><figcaption>Kitchen Centered</figcaption></figure>
+</div>
+<h3>Hallway</h3><div class="row">
+<figure style="max-width:1000px"><a href="images/IMG_6089.jpg"><img src="images/IMG_6089.jpg" width="4032" height="3024" alt="IMG_6089.jpg" loading="lazy"></a><figcaption>Left Elevator</figcaption></figure>
+<figure style="max-width:1000px"><a href="images/IMG_6088.jpg"><img src="images/IMG_6088.jpg" width="4032" height="3024" alt="IMG_6088.jpg" loading="lazy"></a><figcaption>Right Elevator</figcaption></figure>
+</div>
+<h2 id="a2">A.2: Recover Homographies</h2>
+<p>I selected 14 matching points for the two views of Berkeley using the provided correspondence tool and loaded its JSON export. Matching numbers identify the same scene point in both images. Coordinates are (x, y), with x increasing rightward and y downward.</p>
+<figure style="max-width:1000px"><a href="images/correspondences.png"><img src="images/correspondences.png" width="2824" height="1095" alt="Fourteen numbered correspondences: IMG_5998 (left) and IMG_5999 (right)." loading="lazy"></a><figcaption>Fourteen numbered correspondences: IMG_5998 (left) and IMG_5999 (right).</figcaption></figure>
+<p>The homography maps a source point (x, y) to a target point (u, v). I set the lower-right entry to 1, leaving eight unknowns:</p>
+<pre>    [ h11 h12 h13 ]
+H = [ h21 h22 h23 ]
+    [ h31 h32  1  ]
+
+u = (h11*x + h12*y + h13) / (h31*x + h32*y + 1)
+v = (h21*x + h22*y + h23) / (h31*x + h32*y + 1)</pre>
+<p>Rearranging gives two linear equations for each correspondence:</p>
+<pre>[ x y 1 0 0 0 -u*x -u*y ] h = [ u ]
+[ 0 0 0 x y 1 -v*x -v*y ]     [ v ]
+
+h = [h11, h12, h13, h21, h22, h23, h31, h32]^T
+A h = b</pre>
+<p>Stacking 14 pairs produces a 28 × 8 matrix A and a 28-element vector b. My computeH(im1_pts, im2_pts) uses np.linalg.lstsq to minimize ||Ah − b||², then reshapes the eight coefficients and the fixed 1 into H. This uses more than four points to reduce sensitivity to individual selection errors.</p>
+<h3>Recovered H: Berkeley Centered to Right</h3>
+<pre>[[ 5.60130881e-01 -1.95984049e-03  1.29689267e+03]
+ [-1.72522359e-01  8.33622755e-01  2.43378784e+02]
+ [-1.09617801e-04 -1.31125855e-06  1.00000000e+00]]</pre>
+<p>This matrix uses full-resolution image coordinates. After projecting the selected points and dividing by the homogeneous coordinate, the mean Euclidean reprojection error is 3.76 pixels and the maximum is 9.58 pixels. These are errors on the same points used to fit H, not an independent test.</p>
+<h2 id="a3">A.3: Warp the Images</h2>
+<p>Both warpImageNearestNeighbor(im, H) and warpImageBilinear(im, H) use inverse warping. I project the source image corners to find the output bounds, then map each output pixel back through H^-1. Dividing by the third coordinate gives the source location to sample. I have pixels outside the source image remain transparent.</p>
+<pre>[x, y, w]^T = H⁻¹ [u, v, 1]^T
+source location = (x/w, y/w)</pre>
+<p>Nearest-neighbor interpolation rounds the source coordinates to the nearest pixel. Bilinear interpolation combines the four surrounding pixels. For x₀ = floor(x), y₀ = floor(y), a = x − x₀, and b = y − y₀:</p>
+<pre>I(x,y) = (1-a)(1-b) I(x₀,y₀) + a(1-b) I(x₀+1,y₀)
+       + (1-a)b I(x₀,y₀+1)   + ab I(x₀+1,y₀+1)</pre>
+<p>I had the interpolation calculations implemented directly in NumPy. The neighbor indices are kind of clamped at the source boundary.</p>
+<h3>Warping the Berkeley image</h3>
+<figure style="max-width:1000px"><a href="images/set1_comparison.png"><img src="images/set1_comparison.png" width="1781" height="838" alt="Berkeley center warped into Berkeley right coordinates: nearest neighbor and bilinear interpolation." loading="lazy"></a><figcaption>IMG_5998 warped into IMG_5999 coordinates: nearest neighbor and bilinear interpolation.</figcaption></figure>
+<h3>Rectification: two examples</h3>
+<p>For each artwork, I use four outer frame corners as source points and define a rectangular destination by hand. The corner order is top left, top right, bottom right, bottom left. The approximate app measurements determine the rectangle’s width-to-height ratio; they are not exact measurements. I use 40 pixels per inch for the target coordinate spans. Each example uses its own homography.</p>
+<h3>Geometric Art — Left View</h3>
+<p>Approximate dimensions (Used Apple Measuring App): 29.5 × 41 inches (width × height). Output: 1181 × 1641 pixels.</p>
+<pre>Source corners: [[350, 136], [2628, 532], [2639, 3435], [267, 3705]]
+Target corners: [[0, 0], [1180, 0], [1180, 1640], [0, 1640]]</pre>
+<figure style="max-width:500px"><a href="images/geometric_art_source.png"><img src="images/geometric_art_source.png" width="900" height="1080" alt="Source image with the four selected frame corners." loading="lazy"></a><figcaption>Source image with the four selected frame corners.</figcaption></figure>
+<figure style="max-width:1000px"><a href="images/geometric_art_comparison.png"><img src="images/geometric_art_comparison.png" width="1436" height="881" alt="Rectified frame: nearest neighbor (left) and bilinear interpolation (right)." loading="lazy"></a><figcaption>Rectified frame: nearest neighbor (left) and bilinear interpolation (right).</figcaption></figure>
+<figure style="max-width:800px"><a href="images/geometric_art_detail.png"><img src="images/geometric_art_detail.png" width="1759" height="911" alt="Enlarged matching crops for comparing interpolation artifacts." loading="lazy"></a><figcaption>Enlarged matching crops for comparing interpolation artifacts.</figcaption></figure>
+<details><summary>Rectification homography</summary><pre>[[ 4.09654505e-01  9.52684895e-03 -1.44674728e+02]
+ [-8.07093188e-02  4.64282395e-01 -3.48941441e+01]
+ [-8.03342042e-05  9.69347314e-06  1.00000000e+00]]</pre></details>
+<h3>Abstract Art — Right View</h3>
+<p>Approximate dimensions (Once again used measuring app): 40 × 57 inches (width × height). Output: 1601 × 2281 pixels.</p>
+<pre>Source corners: [[438, 519], [2488, 23], [2528, 3825], [491, 3420]]
+Target corners: [[0, 0], [1600, 0], [1600, 2280], [0, 2280]]</pre>
+<figure style="max-width:500px"><a href="images/abstract_art_source.png"><img src="images/abstract_art_source.png" width="900" height="1080" alt="Source image with the four selected frame corners." loading="lazy"></a><figcaption>Source image with the four selected frame corners.</figcaption></figure>
+<figure style="max-width:1000px"><a href="images/abstract_art_comparison.png"><img src="images/abstract_art_comparison.png" width="1415" height="881" alt="Rectified frame: nearest neighbor (left) and bilinear interpolation (right)." loading="lazy"></a><figcaption>Rectified frame: nearest neighbor (left) and bilinear interpolation (right).</figcaption></figure>
+<figure style="max-width:800px"><a href="images/abstract_art_detail.png"><img src="images/abstract_art_detail.png" width="1759" height="911" alt="Enlarged matching crops for comparing interpolation artifacts." loading="lazy"></a><figcaption>Enlarged matching crops for comparing interpolation artifacts.</figcaption></figure>
+<details><summary>Rectification homography</summary><pre>[[ 1.08821075e+00 -1.98811340e-02 -4.66318001e+02]
+ [ 1.99779128e-01  8.25700023e-01 -5.16041570e+02]
+ [ 1.61010190e-04 -6.96414616e-06  1.00000000e+00]]</pre></details>
+<p>The frames become rectangular in both examples. Nearest neighbor keeps individual pixel values but produces more jagged edges when magnified. On the other hand Bilinear interpolation gives smoother edges, with some smoothing of fine details. Rectification changes perspective but it does not remove reflections or flatten the physical depth of the geometric artwork which we can see. My apartment's artwork is unharmed!</p>
+<h3>Speed and quality</h3>
+<table><tr><th>Example</th><th>Nearest neighbor</th><th>Bilinear</th></tr>
+<tr><td>Berkeley warp</td><td>1.543 s</td><td>2.575 s</td></tr>
+<tr><td>Geometric Art</td><td>0.182 s</td><td>0.311 s</td></tr>
+<tr><td>Abstract Art</td><td>0.308 s</td><td>0.556 s</td></tr>
+</table><p>These are warp times from one saved run, this is not including figure creation and file saving. Nearest neighbor is faster because it samples one pixel, bilinear uses four samples and weights. I use bilinear for the mosaics to make resampling edges smoother and the images come out nicer.</p>
+<h2 id="a4">A.4: Blend the Images into a Mosaic</h2>
+<p>For each pair, I estimate H from the supplied correspondences and keep the second image as the reference view. The crossover of the transformed first image corners and the reference image bounds kind of creates my mosaic canvas. A translation moves this canvas into nonnegative coordinates. Then I inverse warp both images onto it with bilinear interpolation.</p>
+<p>I rendered the mosaic images half resolution to reduce massive computation. After some research I found Pillow’s Lanczos filter and only used it for this initial resize. I transform H into the resized coordinate system but the actual perspective warp uses my bilinear implementation.</p>
+<p>For blending, each valid pixel receives a weight equal to its distance from the nearest invalid pixel in that image’s warped mask. I compute these distances with scipy.ndimage.distance_transform_edt. Pixels farther from an image boundary have more influence. In the overlap, I normalize the weighted sum like this:</p>
+<pre>mosaic = (w₁ I₁ + w₂ I₂) / (w₁ + w₂)</pre>
+<p>Where only one image is valid, its color is preserved. Where neither image is valid, the output is transparent. Feathering softens seams but cannot correct mismatched geometry or moving objects.</p>
+<h3>Berkeley mosaic</h3>
+<p>IMG_5998 → IMG_5999; 14 correspondences. Full resolution mean reprojection error: 3.76 px; maximum: 9.58 px.</p>
+<figure style="max-width:1000px"><a href="images/berkeley_comparison.png"><img src="images/berkeley_comparison.png" width="2169" height="1584" alt="Top: source photographs. Bottom: hard overwrite (left) and weighted blending (right)." loading="lazy"></a><figcaption>Top: source photographs. Bottom: hard overwrite (left) and weighted blending (right).</figcaption></figure>
+<figure style="max-width:1000px"><a href="images/berkeley_mosaic.png"><img src="images/berkeley_mosaic.png" width="3203" height="2272" alt="Berkeley mosaic with weighted blending." loading="lazy"></a><figcaption>Berkeley mosaic with weighted blending.</figcaption></figure>
+<p>The building aligns well overall. Some moving cars appear twice, and the sky has an exposure difference between the photographs.</p>
+<h3>Kitchen mosaic</h3>
+<p>Kitchen Left → Kitchen Right; 18 correspondences. Full resolution mean reprojection error: 41.66 px; maximum: 101.80 px.</p>
+<figure style="max-width:1000px"><a href="images/kitchen_comparison.png"><img src="images/kitchen_comparison.png" width="2224" height="1583" alt="Top: source photographs. Bottom: hard overwrite (left) and weighted blending (right)." loading="lazy"></a><figcaption>Top: source photographs. Bottom: hard overwrite (left) and weighted blending (right).</figcaption></figure>
+<figure style="max-width:1000px"><a href="images/kitchen_mosaic.png"><img src="images/kitchen_mosaic.png" width="2805" height="1903" alt="Kitchen mosaic with weighted blending." loading="lazy"></a><figcaption>Kitchen mosaic with weighted blending.</figcaption></figure>
+<p>Blending softens the brightness seam, but nearby objects and the chair still show noticeable ghosting. The large fitting error suggests inconsistent matches and/or parallax. A single homography cannot align different depths if the camera translated. Another big issue is that there are no real features that I could match on the wall (since the textures are not differentiable). However, I talked to a TA and he said it shouldn't be a problem and I shouldn't lose points. This is a good example of real world inconsistencies.</p>
+<h3>Hallway mosaic</h3>
+<p>Left Elevator → Right Elevator; used 18 correspondences. Full resolution mean reprojection error: 14.71 px; maximum: 30.37 px.</p>
+<figure style="max-width:1000px"><a href="images/hallway_comparison.png"><img src="images/hallway_comparison.png" width="2199" height="1584" alt="Top: source photographs. Bottom: hard overwrite (left) and weighted blending (right)." loading="lazy"></a><figcaption>Top: source photographs. Bottom: hard overwrite (left) and weighted blending (right).</figcaption></figure>
+<figure style="max-width:1000px"><a href="images/hallway_mosaic.png"><img src="images/hallway_mosaic.png" width="4578" height="3170" alt="Hallway mosaic with weighted blending." loading="lazy"></a><figcaption>Hallway mosaic with weighted blending.</figcaption></figure>
+<p>The hallway forms a wider view, with extremely minor residual edge misalignment. The left side stretches because it is warped into the second image’s perspective.</p>
+</body>
+</html>
